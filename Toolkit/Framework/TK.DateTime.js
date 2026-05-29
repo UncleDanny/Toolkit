@@ -14,6 +14,7 @@ window.TK.DateTime = {
     WeekStart: 1, // 0 Sunday, 1 Monday
     ValueIsEpoch: false,
     Data: null,
+    Culture: null,
     onchange: function () { },
     readOnly: false,
     disabled: false,
@@ -204,6 +205,39 @@ window.TK.DateTime = {
         
         return direction + this.NumberFormat(hours) + ":" + this.NumberFormat(minutes);
     },
+    FormatDate: function (date, useUTC) {
+        if (this.Culture && window.Intl && Intl.DateTimeFormat) {
+            try {
+                var options = { year: "numeric", month: "2-digit", day: "2-digit" };
+                if (this.EnableTime) {
+                    options.hour = "2-digit";
+                    options.minute = "2-digit";
+                    options.second = "2-digit";
+                    options.hour12 = false;
+                }
+
+                if (useUTC) {
+                    options.timeZone = "UTC";
+                }
+
+                return new Intl.DateTimeFormat(this.Culture, options).format(date);
+            } catch (e) { }
+        }
+
+        const yearMethod = useUTC ? "getUTCFullYear" : "getFullYear";
+        const monthMethod = useUTC ? "getUTCMonth" : "getMonth";
+        const dateMethod = useUTC ? "getUTCDate" : "getDate";
+        const hoursMethod = useUTC ? "getUTCHours" : "getHours";
+        const minutesMethod = useUTC ? "getUTCMinutes" : "getMinutes";
+        const secondsMethod = useUTC ? "getUTCSeconds" : "getSeconds";
+
+        var text = this.NumberFormat(date[yearMethod]()) + "-" + this.NumberFormat(date[monthMethod]() + 1) + "-" + this.NumberFormat(date[dateMethod]());
+        if (this.EnableTime) {
+            text += " " + this.NumberFormat(date[hoursMethod]()) + ":" + this.NumberFormat(date[minutesMethod]()) + ":" + this.NumberFormat(date[secondsMethod]());
+        }
+
+        return text;
+    },
     RefreshDateInput: function (dontFocus) {
         var obj = this;
         
@@ -273,13 +307,9 @@ window.TK.DateTime = {
         }
         
         if (this.GetTimeZone() == "UTC") {
-            this.Elements.DateInputContainer.Elements.DateInput.value = obj.NumberFormat(d.getUTCFullYear()) + "-" + obj.NumberFormat(d.getUTCMonth() + 1) + "-" + obj.NumberFormat(d.getUTCDate());
-            if (this.EnableTime)
-                this.Elements.DateInputContainer.Elements.DateInput.value += " " + obj.NumberFormat(d.getUTCHours()) + ":" + obj.NumberFormat(d.getUTCMinutes()) + ":" + obj.NumberFormat(d.getUTCSeconds());
+            this.Elements.DateInputContainer.Elements.DateInput.value = this.FormatDate(d, true);
         } else if (this.GetTimeZone() == "Local") {
-            this.Elements.DateInputContainer.Elements.DateInput.value = obj.NumberFormat(d.getFullYear()) + "-" + obj.NumberFormat(d.getMonth() + 1) + "-" + obj.NumberFormat(d.getDate());
-            if (this.EnableTime)
-                this.Elements.DateInputContainer.Elements.DateInput.value += " " + obj.NumberFormat(d.getHours()) + ":" + obj.NumberFormat(d.getMinutes()) + ":" + obj.NumberFormat(d.getSeconds());
+            this.Elements.DateInputContainer.Elements.DateInput.value = this.FormatDate(d, false);
         } else {
             // TODO: Implement custom timezones
         }
@@ -510,7 +540,8 @@ window.TK.DateTime = {
                 obj.Elements.DateInputContainer.Elements.DateInput.focus();
             }));
 
-        element.appendChild(getButtons(obj.MonthNames[dateObj.getMonth()],
+        var monthText = this.Culture ? new Intl.DateTimeFormat(this.Culture, { month: "long" }).format(dateObj) : obj.MonthNames[dateObj.getMonth()];
+        element.appendChild(getButtons(monthText,
             function () {
                 var expectedMonth = (dateObj.getMonth() - 1) % 12;
                 dateObj.setMonth(dateObj.getMonth() - 1);
